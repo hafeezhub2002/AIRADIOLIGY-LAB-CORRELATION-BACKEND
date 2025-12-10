@@ -4,43 +4,35 @@ from pydantic import BaseModel
 import io
 from PyPDF2 import PdfReader
 
-# ----------------------------------------------------
 # Initialize FastAPI
-# ----------------------------------------------------
 app = FastAPI()
 
-# ----------------------------------------------------
-# Correct CORS for your real frontend
-# ----------------------------------------------------
+# CORS configuration — allow exact frontend URLs
+origins = [
+    "http://localhost:3000",  # for local testing
+    "https://airadioligy-lab-correlation-f-r3bc.vercel.app",  # deployed frontend
+    "https://airadioligy-lab-correlation-f.vercel.app",       # any other deployed frontend
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://airadioligylabcorrelationf.vercel.app",  # <-- YOUR REAL FRONTEND
-        "https://*.vercel.app",
-    ],
+    allow_origins=origins,  # exact allowed origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ----------------------------------------------------
-# Pydantic Model
-# ----------------------------------------------------
+# Pydantic model for structured data
 class MedicalData(BaseModel):
     radiology_report: str
     lab_values: str
     clinical_notes: str
 
-# ----------------------------------------------------
-# Mock RAG
-# ----------------------------------------------------
+# Mock RAG function (replace with real RAG logic)
 def retrieve_relevant_facts(text: str) -> str:
     return "Relevant medical knowledge found."
 
-# ----------------------------------------------------
-# Mock LLM Response
-# ----------------------------------------------------
+# Mock LLM client (replace with Gemini or any LLM)
 class LLMClient:
     def models_generate_content(self, model: str, contents: str) -> str:
         return (
@@ -51,16 +43,12 @@ class LLMClient:
 
 client = LLMClient()
 
-# ----------------------------------------------------
-# Root Endpoint (for testing)
-# ----------------------------------------------------
+# Root endpoint
 @app.get("/")
 async def root():
     return {"message": "Backend is running successfully!"}
 
-# ----------------------------------------------------
-# Structured Input Endpoint
-# ----------------------------------------------------
+# Structured data endpoint
 @app.post("/analyze")
 async def analyze_data(data: MedicalData):
     try:
@@ -73,16 +61,16 @@ async def analyze_data(data: MedicalData):
         rag_context = retrieve_relevant_facts(combined_text)
 
         prompt = f"""
-        RAG Context:
-        {rag_context}
+RAG Context:
+{rag_context}
 
-        Patient Data:
-        {combined_text}
+Patient Data:
+{combined_text}
 
-        Provide:
-        - Discrepancy Yes/No
-        - Summary
-        - Diagnostic explanation
+Provide:
+- Discrepancy Yes/No
+- Summary
+- Diagnostic explanation
         """
 
         response_text = client.models_generate_content(
@@ -101,9 +89,7 @@ async def analyze_data(data: MedicalData):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ----------------------------------------------------
-# PDF Upload Endpoint
-# ----------------------------------------------------
+# PDF upload endpoint
 @app.post("/analyze_pdf")
 async def analyze_pdf(file: UploadFile = File(...)):
     try:
