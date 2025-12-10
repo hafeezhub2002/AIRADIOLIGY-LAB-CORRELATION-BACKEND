@@ -7,47 +7,47 @@ from PyPDF2 import PdfReader
 # Initialize FastAPI
 app = FastAPI()
 
+# Correct CORS — allow Vercel frontend
 origins = [
     "http://localhost:3000",
-    "https://your-frontend-vercel-url.vercel.app",
+    "https://airadiology-lab-correlation-frontend.vercel.app",   # <-- PUT YOUR REAL VERCEL URL HERE
+    "https://*.vercel.app"
 ]
 
-
-# ✅ Allow CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend URL
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic model for incoming data
+# Pydantic model
 class MedicalData(BaseModel):
     radiology_report: str
     lab_values: str
     clinical_notes: str
 
-# Example RAG retrieval function
+# Mock RAG function (replace later)
 def retrieve_relevant_facts(text: str) -> str:
-    return "Relevant medical knowledge context related to the patient's data."
+    return "Relevant medical knowledge found."
 
-# Example LLM client stub
+# Mock LLM (replace with Gemini later)
 class LLMClient:
     def models_generate_content(self, model: str, contents: str) -> str:
-        # Mock response for demo purposes
-        return """Discrepancy: Yes
-Summary: Radiology report shows mild infiltrates but lab values indicate no infection.
-Diagnostic Explanation: The radiology findings and labs are contradictory; further investigation is needed."""
+        return (
+            "Discrepancy: Yes\n"
+            "Summary: Radiology vs Labs mismatch.\n"
+            "Diagnostic Explanation: Further evaluation needed."
+        )
 
 client = LLMClient()
 
-# ✅ Simple GET endpoint to check server status
 @app.get("/")
 async def root():
-    return {"message": "FastAPI server is running!"}
+    return {"message": "Backend is running successfully!"}
 
-# ✅ POST endpoint for medical analysis (structured input)
+# Structured text endpoint
 @app.post("/analyze")
 async def analyze_data(data: MedicalData):
     try:
@@ -59,22 +59,24 @@ async def analyze_data(data: MedicalData):
 
         rag_context = retrieve_relevant_facts(combined_text)
 
-        prompt = (
-            "You are a medical contradiction detection system.\n\n"
-            f"### RAG Context:\n{rag_context}\n\n"
-            f"### Patient Data:\n{combined_text}\n\n"
-            "Provide a structured response:\n"
-            "- Discrepancy (Yes/No)\n"
-            "- Summary of contradiction\n"
-            "- Diagnostic explanation"
-        )
+        prompt = f"""
+        RAG Context:
+        {rag_context}
+
+        Patient Data:
+        {combined_text}
+
+        Provide:
+        - Discrepancy Yes/No
+        - Summary
+        - Diagnostic explanation
+        """
 
         response_text = client.models_generate_content(
             model="gemini-2.5-flash",
             contents=prompt
         )
 
-        # Parse LLM output
         result = {}
         for line in response_text.split("\n"):
             if ":" in line:
@@ -86,27 +88,26 @@ async def analyze_data(data: MedicalData):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ✅ New POST endpoint to handle PDF uploads
+# PDF endpoint
 @app.post("/analyze_pdf")
 async def analyze_pdf(file: UploadFile = File(...)):
     try:
-        # Read PDF file
         contents = await file.read()
-        pdf_reader = PdfReader(io.BytesIO(contents))
+        reader = PdfReader(io.BytesIO(contents))
         text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
 
-        # For simplicity, we put all text in clinical_notes
-        data = {
-            "radiology_report": "Extracted from PDF",
-            "lab_values": "Extracted from PDF",
-            "clinical_notes": text
-        }
+        for page in reader.pages:
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted + "\n"
 
-        # Reuse existing analyze_data endpoint
-        result = await analyze_data(MedicalData(**data))
-        return result
+        data = MedicalData(
+            radiology_report="Extracted from PDF",
+            lab_values="Extracted from PDF",
+            clinical_notes=text,
+        )
+
+        return await analyze_data(data)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
