@@ -7,6 +7,12 @@ from PyPDF2 import PdfReader
 # Initialize FastAPI
 app = FastAPI()
 
+origins = [
+    "http://localhost:3000",
+    "https://your-frontend-vercel-url.vercel.app",
+]
+
+
 # ✅ Allow CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
